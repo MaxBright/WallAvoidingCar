@@ -159,7 +159,6 @@ bool checkDistance(int minRange = 15)
   return (cm <= minRange && cm != 0);
 }
 
-//useless
 void turn(char rot, int duration = 500)
 {
   if (rot == 'r')

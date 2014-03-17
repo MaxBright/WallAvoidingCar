@@ -146,7 +146,7 @@ bool checkPowerButton()
 }
 
 
-bool checkDistance(int minRange = 15)
+int checkDistance()//int minRange = 15)
 {
   bool result;
   
@@ -156,9 +156,10 @@ bool checkDistance(int minRange = 15)
   
   Serial.println(cm);
   
-  return (cm <= minRange && cm != 0);
+  return cm;//return (cm <= minRange && cm != 0);
 }
 
+//useless
 void turn(char rot, int duration = 500)
 {
   if (rot == 'r')
@@ -281,14 +282,16 @@ void startTurn(int motorSpeed = 127, char dir = 'r')
 
 char updateTurnDirection(int forwardDriveCount, int driveLength, char initialValue)
 {
-  Serial.println("Called UpdateTurnDirection");
   if (forwardDriveCount > driveLength)
   {
+    Serial.println("Updating Turn Direction");
     if (initialValue == 'r')
       return 'l';
     else
       return 'r';
   }
+  else
+    return initialValue;
 }
 
 void loop()                     
@@ -308,101 +311,94 @@ void loop()
   
   if (firstLoop)
   {
-    delay(500);
+    delay(1000);
     poweredOn = checkPowerButton();
     firstLoop = false;
   }
-    
-  if (!poweredOn)
+  
+  if (carState == 's')
   {
-    if (carState == 's')
+    startDriving(255);
+    carState = 'f';
+  }
+  
+  int distance = checkDistance();
+  
+  bool throwaway;
+  if (distance <= 20)
+  {
+    if (carState != 'r')
     {
-      startDriving(255);
-      carState = 'f';
+      turnDirection = updateTurnDirection(forwardDriveCount, 7, turnDirection);
+      digitalWrite(distanceLightPin, HIGH);
+      stopDriving();
+      threadedDelay(100);
+      startReversing(127);
+    }
+    forwardDriveCount = 0;
+  }
+  else if(distance <= 60)
+  {
+    
+    if (carState != 't')
+    {
+      turnDirection = updateTurnDirection(forwardDriveCount, 7, turnDirection);
+      digitalWrite(distanceLightPin, HIGH);
+      stopDriving();
+      threadedDelay(100);
+      startTurn(255, turnDirection);
+      carState = 't';
     }
     
-    bool throwaway;
-    if (checkDistance(20))
+    
+    forwardDriveCount = 0;
+  }
+  else if (distance <= 150)
+  {
+    if (carState != 'm')
     {
-      if (carState != 'r')
-      {
-        turnDirection = updateTurnDirection(forwardDriveCount, 7, turnDirection);
-        stopDriving();
-        threadedDelay(100);
-        startReversing(127);
-      }
-      forwardDriveCount = 0;
-    }
-    else if(checkDistance(60))
-    {
-      Serial.println("Within 75");
-      
-      if (carState != 't')
-      {
-        turnDirection = updateTurnDirection(forwardDriveCount, 7, turnDirection);
-        digitalWrite(distanceLightPin, HIGH);
-        stopDriving();
-        threadedDelay(100);
-        startTurn(255, turnDirection);
-        carState = 't';
-      }
-      
-      
-      forwardDriveCount = 0;
-    }
-    else if (checkDistance(150))
-    {
-      if (carState != 'm')
-      {
-        turnDirection = updateTurnDirection(forwardDriveCount, 7, turnDirection);
-        digitalWrite(distanceLightPin, HIGH);
-        if (carState != 'f')
-        {
-          stopDriving();
-          threadedDelay(100);
-        }
-        startFastTurn(255, 0.5, turnDirection);
-        carState = 'm';
-      }
-      
-      forwardDriveCount = 0;
-    }
-    else
-    {
-      digitalWrite(distanceLightPin, LOW);
+      turnDirection = updateTurnDirection(forwardDriveCount, 7, turnDirection);
+      digitalWrite(distanceLightPin, HIGH);
       if (carState != 'f')
       {
-        if (carState == 't' || carState == 'r')
-        {
-          stopDriving();
-          threadedDelay(100);
-        }
-        startDriving(255);
-        carState = 'f';
-        
+        stopDriving();
+        threadedDelay(100);
       }
-      forwardDriveCount += 1;
-      
+      startFastTurn(255, 0.5, turnDirection);
+      carState = 'm';
     }
     
-    distanceCheckpoint = millis();
-
-    threadedDelay(200, initialTime);
-    
-    debugCurrentTime = millis();
-    distanceTime = distanceCheckpoint - debugStartTime;
-    betweenTime = debugCurrentTime - debugStartTime;
-
+    forwardDriveCount = 0;
   }
   else
   {
-    if (carState != 's')
-      stopDriving();
-    digitalWrite(distanceLightPin, HIGH);
-    threadedDelay(1000);
     digitalWrite(distanceLightPin, LOW);
+    if (carState != 'f')
+    {
+      if (carState == 't' || carState == 'r')
+      {
+        stopDriving();
+        threadedDelay(100);
+      }
+      startDriving(255);
+      carState = 'f';
+      
+    }
+    forwardDriveCount += 1;
+    
   }
   
+  distanceCheckpoint = millis();
+
+  threadedDelay(200, initialTime);
+  
+  debugCurrentTime = millis();
+  distanceTime = distanceCheckpoint - debugStartTime;
+  betweenTime = debugCurrentTime - debugStartTime;
+
+  Serial.print("forwardDriveCount=");
+  Serial.println(forwardDriveCount);
+  Serial.println("End of loop");
 }
 
 
